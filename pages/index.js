@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import axios from "axios";
 import Head from "next/head";
 import Image from "next/image";
 import Files from "@/components/Files";
@@ -7,10 +8,11 @@ export default function Home() {
   const [file, setFile] = useState("");
   const [cid, setCid] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [id, setId] = useState(0);
 
   const inputFile = useRef(null);
 
-  const uploadFile = async (fileToUpload) => {
+  const uploadFile = async (fileToUpload, id) => {
     try {
       setUploading(true);
       const formData = new FormData();
@@ -20,6 +22,58 @@ export default function Home() {
         body: formData,
       });
       const ipfsHash = await res.text();
+
+      const metadata = {
+        'name': id + ".prism",
+        'image': "ipfs.io/ipfs/" + ipfsHash,
+        'desc': "NFT allocated to the id '" + id + ".prism" + "'"
+      }
+
+  //     "name": "Storms - Nebraska Supercell",
+  // "collection_name": "Storms",
+  // "artist_address": "0xa146e68f27e68b315c6b59a8adaeb11b74713077",
+  // "description": "Mitch Dobrowner has been chasing storms since 2009, traveling throughout Western and Midwestern America to capture nature in its full fury. Represented by Kopeikin Gallery, Los Angeles.\n\n\nDate: 2009",
+  // "image": "ipfs://QmP91rBud4nGhbGi5mpchCqV6sycikTts9Qp48PYcvk6to/61e957ebb50f013a01efc0cb.jpg",
+  // "external_url": "https://quantum.art",
+  // "attributes": [
+  //   {
+  //     "trait_type": "Artist",
+  //     "value": "Mitch Dobrowner"
+  //   },
+  //   {
+  //     "trait_type": "Category",
+  //     "value": "Photography"
+  //   },
+  //   {
+  //     "trait_type": "Collection",
+  //     "value": "Storms"
+  //   },
+  //   {
+  //     "trait_type": "Season",
+  //     "value": "Season 2"
+  //   },
+  //   {
+  //     "trait_type": "Selection",
+  //     "value": "Quantum Curated"
+  //   }
+  // ]
+
+      // Convert JSON object to Blob
+      const jsonBlob = new Blob([JSON.stringify(metadata)], { type: 'application/json' });
+
+      const jsonFormData = new FormData();
+      jsonFormData.append('file', jsonBlob, `${id}.json`);
+
+      const response = await axios.post('https://api.pinata.cloud/pinning/pinFileToIPFS', jsonFormData, {
+        maxContentLength: Infinity,
+        maxBodyLength: Infinity,
+        headers: {
+          'Content-Type': `multipart/form-data; boundary=${jsonFormData._boundary}`,
+          pinata_api_key: "29b2e3804ec15a52b144",
+          pinata_secret_api_key: "9a963eb892c38bdc34f6834c8be2e20e12e2be1518611c2a631e968cc929f663",
+        },
+      });
+
       setCid(ipfsHash);
       setUploading(false);
     } catch (e) {
@@ -31,7 +85,7 @@ export default function Home() {
 
   const handleChange = (e) => {
     setFile(e.target.files[0]);
-    uploadFile(e.target.files[0]);
+    uploadFile(e.target.files[0], id);
   };
 
   const loadRecent = async () => {
@@ -45,10 +99,14 @@ export default function Home() {
     }
   };
 
+  const onChangeId = (event) => {
+    setId(event.target.value);
+  }
+
   return (
     <>
       <Head>
-        <title>Pinata Next.js App</title>
+        <title>NFT Upload on Pinata Ipfs</title>
         <meta name="description" content="Generated with create-pinata-app" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href="/pinnie.png" />
@@ -76,6 +134,15 @@ export default function Home() {
                   onChange={handleChange}
                   style={{ display: "none" }}
                 />
+                <div className="flex">
+                  <p className="p-2.5">NFT ID</p>
+                  <input
+                    id="id"
+                    onChange={(e) => onChangeId(e)}
+                    className="w-[150px] bg-light text-secondary border-2 border-secondary py-2 px-4 transition-all duration-300 ease-in-out"
+                  />
+                </div>
+
                 <div>
                   <button onClick={loadRecent} className="mr-10 w-[150px] bg-light text-secondary border-2 border-secondary rounded-3xl py-2 px-4 hover:bg-secondary hover:text-light transition-all duration-300 ease-in-out">
                     Load recent
